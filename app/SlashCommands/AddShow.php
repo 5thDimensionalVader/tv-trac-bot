@@ -65,9 +65,10 @@ class AddShow extends SlashCommand
      * @param  \Discord\Parts\Interactions\Interaction  $interaction
      * @return void
      */
-    public function handle($interaction)
+    public function handle($interaction): void
     {
         $title = $interaction->data->options->offsetGet('title')->value;
+//        TODO: change $tv_shows to $ftv_response to be more descriptive.
         $tv_shows = $this->findTvShowByTitle($title);
 
         if(isset($tv_shows) && is_array($tv_shows)){
@@ -79,24 +80,22 @@ class AddShow extends SlashCommand
                 $show = json_decode($show, true);
                 $date_formatted = explode('-', $show['premiered'])[0];
                 $message->button("{$show['name']} ($date_formatted)", function (Interaction $interaction) use ($show) {
+//                    TODO: change $func_res to $string_response to be more descriptive.
                     $func_res = $this->findTvShowById($interaction->data->custom_id);
-                    $reply =  $this->message()
-                        ->title($show['name'] === $func_res ? "Showed added!": "Something went wrong")
-                        ->content($show['name'] === $func_res ? "Yay! You've added $func_res to be tracked!": "$func_res");
-                    if($show['name'] === $func_res){
-                        $reply->success();
-                    } else {
-                        $reply->error();
-                    }
-
                     return $interaction->respondWithMessage(
-                        $reply->build()
+                        $this->message()
+                            ->title("Show registered!")
+                            ->content("Nice! You've added $func_res to be tracked!")
+                            ->success()
+                            ->build(),
+                        ephemeral: true
                     );
                 }, options: ["custom_id" => $show['thetvdb']]);
             }
 
             $interaction->respondWithMessage(
-                $message->build()
+                $message->build(),
+                ephemeral: true
             );
         } elseif (isset($tv_shows) && is_string($tv_shows)) {
             $interaction->respondWithMessage(
@@ -104,20 +103,22 @@ class AddShow extends SlashCommand
                     ->message()
                     ->title('Something went wrong')
                     ->content("$tv_shows")
+                    ->error()
                     ->build()
             );
         } else {
             $interaction->respondWithMessage(
                 $this
                     ->message()
-                    ->title('Show added!')
-                    ->content("Yay! You've added {$title} to be tracked!")
+                    ->title('Show registered!')
+                    ->content("Nice! You've added {$title} to be tracked!")
+                    ->success()
                     ->build()
             );
         }
     }
 
-    private function findTvShowByTitle(string $title)
+    private function findTvShowByTitle(string $title): array | string
     {
         $base_url = env("BASE_URL");
         $response = Http::get("$base_url/search/shows?q=$title");
@@ -138,7 +139,7 @@ class AddShow extends SlashCommand
                 return $temp;
             } else {
                 if ($response->json()[0]['show']['status'] === "Running"){
-                    return $this->createShow($response->json()[0]['show']['name'], $response->json()[0]['show']['id']);
+                    $this->createShow($response->json()[0]['show']['name'], $response->json()[0]['show']['id']);
                 } else {
                     return "This show is currently not running!";
                 }
@@ -149,19 +150,15 @@ class AddShow extends SlashCommand
         }
     }
 
-    private function findTvShowById(int $id)
+    private function findTvShowById(int $id): string
     {
         $base_url = env("BASE_URL");
         $response = Http::get("$base_url/lookup/shows?thetvdb=$id");
 
         if($response->ok()){
             if($response->json()['status'] === "Running"){
-                $created = $this->createShow($response->json()['name'], $response->json()['id']);
-                if(isset($created) && is_string($created)){
-                    return $created;
-                } else {
-                    return $response->json()['name'];
-                }
+                $this->createShow($response->json()['name'], $response->json()['id']);
+                return $response->json()['name'];
             }
         } else {
             $status = (string) $response->status();
@@ -169,23 +166,16 @@ class AddShow extends SlashCommand
         }
     }
 
-    private function createShow($name, $show_id)
+    private function createShow($name, $show_id): void
     {
-//        TODO: if the unique index is not used for the $show_id, find a logic to check if the $show_id already exists in the database.
-//        TODO: if the unique index is used, make use of firstOrCreate() method and handle the message response.
-//        $create_show = new Show;
-//        $res = $create_show->where('show_id', $show_id)->get();
-//        if($res->contains($show_id)){
-//            return "This show is already registered, thank you!";
-//        } else {
-//            $create_show->name = $name;
-//            $create_show->show_id = $show_id;
-//
-//            $create_show->save();
-//        }
-        Show::create([
-            'name' => $name,
-            'show_id' => $show_id
-        ]);
+//        Show::create([
+//            'name' => $name,
+//            'show_id' => $show_id
+//        ]);
+        try {
+            $show = Show::firstOrCreate(['show_id' => $show_id], ['name' => $name]);
+        } catch (\Exception $e){
+            $this->console()->error(" Error -> $e");
+        }
     }
 }
