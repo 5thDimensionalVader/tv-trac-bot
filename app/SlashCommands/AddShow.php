@@ -129,7 +129,7 @@ class AddShow extends SlashCommand
         }
     }
 
-    private function findTvShowByTitle(string $title): array | string
+    private function findTvShowByTitle(string $title)
     {
         $base_url = env("BASE_URL");
         $response = Http::get("$base_url/search/shows?q=$title");
@@ -161,7 +161,7 @@ class AddShow extends SlashCommand
         }
     }
 
-    private function findTvShowById(int $id): string
+    private function findTvShowById(int $id)
     {
         $base_url = env("BASE_URL");
         $response = Http::get("$base_url/lookup/shows?thetvdb=$id");
@@ -177,15 +177,10 @@ class AddShow extends SlashCommand
         }
     }
 
-    private function createShow($name, $show_id): string
+    private function createShow($name, $show_id)
     {
         try {
-//            TODO: try chaining a where and firstOr together.
-            $show = Show::firstOrCreate(['show_id' => $show_id], ['name' => $name]);
-
-            if($show){
-                return "$show->name already exists in the database!";
-            }
+//            TODO: find a good method to be able to check if the show already exists in the database and create it if it doesn't exist.
         } catch (\Exception $e){
             $this->console()->error("$e");
         }
