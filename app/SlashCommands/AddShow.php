@@ -81,15 +81,26 @@ class AddShow extends SlashCommand
                 $date_formatted = explode('-', $show['premiered'])[0];
                 $message->button("{$show['name']} ($date_formatted)", function (Interaction $interaction) use ($show) {
 //                    TODO: change $func_res to $string_response to be more descriptive.
-                    $func_res = $this->findTvShowById($interaction->data->custom_id);
-                    return $interaction->respondWithMessage(
-                        $this->message()
-                            ->title("Show registered!")
-                            ->content("Nice! You've added $func_res to be tracked!")
-                            ->success()
-                            ->build(),
-                        ephemeral: true
-                    );
+                    $string_response = $this->findTvShowById($interaction->data->custom_id);
+                    if(isset($string_response) && is_string($string_response)){
+                        return $interaction->respondWithMessage(
+                            $this
+                                ->message()
+                                ->title('Something went wrong')
+                                ->content("$string_response")
+                                ->error()
+                                ->build(), ephemeral: true
+                        );
+                    } else {
+                        return $interaction->respondWithMessage(
+                            $this->message()
+                                ->title("Show registered!")
+                                ->content("Nice! You've added {$show['name']} to be tracked!")
+                                ->success()
+                                ->build(),
+                            ephemeral: true
+                        );
+                    }
                 }, options: ["custom_id" => $show['thetvdb']]);
             }
 
@@ -104,7 +115,7 @@ class AddShow extends SlashCommand
                     ->title('Something went wrong')
                     ->content("$tv_shows")
                     ->error()
-                    ->build()
+                    ->build(), ephemeral: true
             );
         } else {
             $interaction->respondWithMessage(
@@ -139,7 +150,7 @@ class AddShow extends SlashCommand
                 return $temp;
             } else {
                 if ($response->json()[0]['show']['status'] === "Running"){
-                    $this->createShow($response->json()[0]['show']['name'], $response->json()[0]['show']['id']);
+                    return $this->createShow($response->json()[0]['show']['name'], $response->json()[0]['show']['id']);
                 } else {
                     return "This show is currently not running!";
                 }
@@ -158,7 +169,7 @@ class AddShow extends SlashCommand
         if($response->ok()){
             if($response->json()['status'] === "Running"){
                 $this->createShow($response->json()['name'], $response->json()['id']);
-                return $response->json()['name'];
+                return $this->createShow($response->json()['name'], $response->json()['id']);
             }
         } else {
             $status = (string) $response->status();
@@ -166,16 +177,17 @@ class AddShow extends SlashCommand
         }
     }
 
-    private function createShow($name, $show_id): void
+    private function createShow($name, $show_id): string
     {
-//        Show::create([
-//            'name' => $name,
-//            'show_id' => $show_id
-//        ]);
         try {
+//            TODO: try chaining a where and firstOr together.
             $show = Show::firstOrCreate(['show_id' => $show_id], ['name' => $name]);
+
+            if($show){
+                return "$show->name already exists in the database!";
+            }
         } catch (\Exception $e){
-            $this->console()->error(" Error -> $e");
+            $this->console()->error("$e");
         }
     }
 }
